@@ -32,7 +32,7 @@
       <q-item 
         v-ripple 
         v-for="(task, index) in tasks"
-        :key="task.title"
+        :key="task.id"
         @click="task.done = !task.done"
         clickable
         :class="{'done bg-blue-1': task.done}"
@@ -82,44 +82,72 @@
 </template>
 
 <script>
+
+import { db } from 'boot/firebase';
+
 export default {
   data() {
     return {
       newTask: '',
-      tasks: [
-        // {
-        //   title: 'Get apples',
-        //   done: false
-        // },
-        // {
-        //   title: 'Wash the dishes',
-        //   done: false
-        // },
-        // {
-        //   title: 'Organize my room',
-        //   done: false
-        // }
-      ]
+      tasks: []
     }
   },
+  created() {
+    this.listTasks();
+  },
   methods: {
+    async listTasks() {
+      try {
+        const dbResponse = await db.collection('todo_tasks').get();
+
+        dbResponse.forEach(element => {
+          const task = {
+            id: element.id,
+            title: element.data().title,
+            done: element.data().done
+          }
+          this.tasks.push(task);
+        });
+      } catch (error) {
+        console.log(error);
+      }
+    },
     deleteTask(index) {
+      const id = this.tasks[index].id
+      console.log(id)
       this.$q.dialog({
         title: 'Confirm',
         message: 'Are you sure do you want to delete it?',
         cancel: true,
         persistent: true
-      }).onOk(() => {
-        this.tasks.splice(index, 1)
+      }).onOk(async () => {
+        try {
+          await db.collection('todo_tasks').doc(id).delete();
+          this.tasks.splice(index, 1)
+        } catch (error) {
+          console.log(error);
+        }
+
         this.$q.notify('Task deleted')
       })
     },
-    addTask() {
-      this.tasks.push({
-        title: this.newTask,
-        done: false
-      })
-      this.newTask = ''
+    async addTask() {
+      try {
+        const dbResponse = await db.collection('todo_tasks').add({
+          title: this.newTask,
+          done: false
+        })
+
+        this.tasks.push({
+          id: dbResponse.id,
+          title: this.newTask,
+          done: false
+        })
+        this.newTask = ''
+        this.$q.notify('Task created')
+      } catch (error) {
+        console.log(error)
+      }
     }
   }
 }
